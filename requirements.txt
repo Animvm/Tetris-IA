@@ -1,0 +1,6 @@
+gymnasium
+numpy
+gym-tetris
+torch
+matplotlib
+tensorboard
