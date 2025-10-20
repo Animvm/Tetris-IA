@@ -4,7 +4,6 @@
 
 Desarrollo e implementación de diferentes agentes de IA para jugar Tetris utilizando técnicas de búsqueda, reinforcement learning y MCTS. El objetivo es entrenar agentes que maximicen la puntuación y alcancen el nivel más alto posible.
 
-
 ## Instalación
 
 ### Requisitos previos
@@ -23,3 +22,14 @@ source tetris_env/bin/activate
 
 # Instalar dependencias
 pip install -r requirements.txt
+```
+
+### Verificar instalación
+```bash
+python experiments/test_environment.py
+```
+
+## Referencias
+
+- [gym-tetris](https://github.com/Kautenja/gym-tetris)
+- [Gymnasium Documentation](https://gymnasium.farama.org/)

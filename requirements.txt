@@ -1,5 +1,5 @@
-gymnasium
-numpy
+gym==0.26.2
+numpy<2.0
 gym-tetris
 torch
 matplotlib
