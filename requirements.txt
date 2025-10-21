@@ -1,0 +1,5 @@
+gymnasium>=0.29
+numpy
+matplotlib
+pygame        # opcional para render, puede quitarse si no quieres ventana
+torch         # para DQN
