@@ -1,14 +1,5 @@
-<<<<<<< HEAD
-gym==0.26.2
-numpy<2.0
-gym-tetris
-torch
-matplotlib
-tensorboard
-=======
 gymnasium>=0.29
 numpy
 matplotlib
 pygame        # opcional para render, puede quitarse si no quieres ventana
 torch         # para DQN
->>>>>>> IA-juegos/master
