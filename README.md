@@ -47,7 +47,7 @@ source venv/bin/activate  # En Linux/Mac
 pip install --upgrade pip
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install gymnasium pygame numpy matplotlib tqdm
-``
+``` 
 🏗️ Estructura del proyecto
 
 IA-juegos/
