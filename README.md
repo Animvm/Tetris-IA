@@ -35,19 +35,19 @@ python experiments/test_environment.py
 - [Gymnasium Documentation](https://gymnasium.farama.org/)
 
 -------------------------------------------------------------------------------------------------------------------------------------
-
+```bash
 python3 -m venv venv
 source venv/bin/activate  # En Linux/Mac
 # o venv\Scripts\activate en Windows
-
+``
 3️⃣ Instalar dependencias (solo CPU)
 
     No necesitas GPU ni CUDA.
-
+```bash
 pip install --upgrade pip
 pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 pip install gymnasium pygame numpy matplotlib tqdm
-
+``
 🏗️ Estructura del proyecto
 
 IA-juegos/
