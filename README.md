@@ -39,7 +39,7 @@ python experiments/test_environment.py
 python3 -m venv venv
 source venv/bin/activate  # En Linux/Mac
 # o venv\Scripts\activate en Windows
-``
+```
 3️⃣ Instalar dependencias (solo CPU)
 
     No necesitas GPU ni CUDA.
