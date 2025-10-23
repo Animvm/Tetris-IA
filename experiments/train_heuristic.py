@@ -1,3 +1,6 @@
+import sys
+sys.path.append('.')
+
 # train_heuristic.py
 from envs.tetris_env import TetrisEnv
 from agents.heuristic_agent import HeuristicAgent

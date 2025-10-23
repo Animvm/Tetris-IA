@@ -206,4 +206,39 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Entornos virtuales del proyecto
 tetris_env/
+venv/
+
+# Modelos entrenados (pueden ser pesados)
+models/*.pth
+models/*.h5
+models/*.pkl
+models/*.pt
+
+# Resultados y logs
+results/
+logs/
+*.log
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Pygame/visualización
+*.mp4
+*.avi
+*.gif
+
+# IDEs adicionales
+.vscode/
+.idea/
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Datos temporales
+*.tmp
+*.bak
+*.swp
+*~

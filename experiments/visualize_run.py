@@ -1,3 +1,6 @@
+import sys
+sys.path.append('.')
+
 # visualize_run.py
 import time
 from envs.tetris_env import TetrisEnv

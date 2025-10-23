@@ -1,5 +1,6 @@
 gymnasium>=0.29
-numpy
+numpy<2.0
+pygame
+torch
 matplotlib
-pygame        # opcional para render, puede quitarse si no quieres ventana
-torch         # para DQN
+tensorboard

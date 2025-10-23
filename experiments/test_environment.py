@@ -1,22 +1,34 @@
-"""Test básico del ambiente de Tetris"""
-import gym
-import gym_tetris
+"""
+Test del ambiente de Tetris
+"""
+import sys
+sys.path.append('.')
+
+from envs.tetris_env import TetrisEnv
+
+print("Probando ambiente de Tetris...\n")
 
 # Crear ambiente
-env = gym.make('TetrisA-v0')
-print(f"Ambiente creado: TetrisA-v0")
-print(f"Observación shape: {env.observation_space.shape}")
-print(f"Acciones disponibles: {env.action_space.n}")
+env = TetrisEnv(rows=20, cols=10)
+print(f"✓ Ambiente creado")
+print(f"  Observación shape: {env.observation_space.shape}")
+print(f"  Acciones disponibles: {env.action_space.n}")
 
 # Test rápido
-obs = env.reset()
+obs, info = env.reset()
+total_reward = 0
+
 for step in range(100):
     action = env.action_space.sample()
-    obs, reward, done, info = env.step(action)
+    obs, reward, terminated, truncated, info = env.step(action)
+    total_reward += reward
     
-    if done:
-        print(f"\nJuego terminado en step {step}")
+    if terminated or truncated:
+        print(f"\n✓ Juego terminado en step {step}")
+        print(f"  Score: {info['score']}")
+        print(f"  Líneas completadas: {info['lines']}")
+        print(f"  Reward total: {total_reward}")
         break
 
 env.close()
-print("Test completado exitosamente")
+print("\n✓ Test completado exitosamente")
