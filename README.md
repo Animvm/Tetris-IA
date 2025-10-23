@@ -24,93 +24,61 @@ source tetris_env/bin/activate
 pip install -r requirements.txt
 ```
 
+**Nota:** Si no tienes GPU o quieres instalar PyTorch solo para CPU:
+```bash
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+```
+
 ### Verificar instalación
 ```bash
 python experiments/test_environment.py
 ```
+## Estructura del Proyecto
+```
+Tetris-IA/
+├── agents/          # Implementación de agentes IA
+├── envs/            # Ambiente de Tetris 
+├── experiments/     # Scripts de entrenamiento
+├── utils/           # Utilidades
+└── models/          # Modelos entrenados
+```
+
+## Uso
+
+### Probar el ambiente
+```bash
+python experiments/test_environment.py
+```
+
+### Entrenar agente heurístico
+```bash
+python experiments/train_heuristic.py
+```
+
+Esto:
+- Entrena el agente durante varios episodios
+- Muestra el progreso por terminal (ej: `Ep 10/200 reward 150 lines 6`)
+- Genera gráficos con métricas de rendimiento en `results/heuristic_progress.png`
+
+Los gráficos incluyen:
+- Reward por episodio
+- Líneas completadas
+- Media móvil del desempeño
+
+### Visualizar agente jugando
+```bash
+python experiments/visualize_run.py
+```
+
+Esto abre una ventana mostrando:
+- El tablero de Tetris en tiempo real
+- La pieza actual
+- Score y líneas eliminadas
+- Velocidad configurable
+
+Los resultados se pueden guardar en `results/visual_scores.txt`.
+
 
 ## Referencias
 
-- [gym-tetris](https://github.com/Kautenja/gym-tetris)
 - [Gymnasium Documentation](https://gymnasium.farama.org/)
-
--------------------------------------------------------------------------------------------------------------------------------------
-```bash
-python3 -m venv venv
-source venv/bin/activate  # En Linux/Mac
-# o venv\Scripts\activate en Windows
-```
-3️⃣ Instalar dependencias (solo CPU)
-
-    No necesitas GPU ni CUDA.
-```bash
-pip install --upgrade pip
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-pip install gymnasium pygame numpy matplotlib tqdm
-``` 
-🏗️ Estructura del proyecto
-
-IA-juegos/
-│
-├── envs/
-│   └── tetris_env.py           # Entorno personalizado Gymnasium
-│
-├── agents/
-│   └── heuristic_agent.py      # Agente heurístico (reglas simples)
-│
-├── utils/
-│   └── plotting.py             # Funciones para graficar métricas
-│
-├── train_heuristic.py          # Entrenamiento heurístico + gráficos
-├── visualize_run.py            # Visualización del agente jugando
-└── README.md                   # Este archivo
-
-🧠 Entrenar el agente heurístico
-
-Ejecuta:
-
-python train_heuristic.py
-
-Esto:
-
-    Entrena el agente durante varios episodios.
-
-    Muestra el progreso por terminal:
-
-Ep 10/200 reward 150 lines 6
-Ep 20/200 reward 230 lines 9
-...
-
-Genera un gráfico con métricas de rendimiento:
-
-    results/heuristic_progress.png
-
-📊 El gráfico incluye
-
-    Reward por episodio (total de puntos).
-
-    Líneas completadas.
-
-    Media móvil del desempeño.
-
-🎮 Visualizar el juego en tiempo real
-
-Puedes ver cómo juega el agente heurístico en el entorno Tetris:
-
-python visualize_run.py
-
-Esto abre una ventana con:
-
-    El tablero de Tetris.
-
-    La pieza actual.
-
-    Score y líneas eliminadas.
-
-    Velocidad configurable (delay_ms).
-
-También puedes guardar los resultados de cada partida:
-
-# Dentro de visualize_run.py
-with open("results/visual_scores.txt", "a") as f:
-    f.write(f"{ep+1},{info['score']},{info['lines']}\n")
