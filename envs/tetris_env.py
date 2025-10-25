@@ -117,11 +117,19 @@ class TetrisEnv(gym.Env):
             return self._get_obs(), 0.0, True, False, {"score": self.score, "lines": self.lines_cleared_total}
         col = int(action // 4)
         rot = int(action % 4)
+
+        if col >= self.cols:
+            return self._get_obs(), -10, False, False, {"score": self.score, "lines": self.lines_cleared_total}
+
         piece = rotate(TETROMINOS[self.current_piece_name], rot)
+
+        if col + piece.shape[1] > self.cols:
+            return self._get_obs(), -10, False, False, {"score": self.score, "lines": self.lines_cleared_total}
+
         valid, reward = self.place_piece(piece, col)
         if not valid:
             self.done = True
-            reward = -50
+            reward = -10
         else:
             self.spawn_piece()
         obs = self._get_obs()
