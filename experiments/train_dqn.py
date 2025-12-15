@@ -26,12 +26,12 @@ def pygame_delay(ms):
 def replay_episode(actions, delay_ms=100):
     """
     Reproducir un episodio usando las acciones guardadas
-    
+
     Args:
         actions: lista de acciones a reproducir
         delay_ms: delay entre pasos (ms)
     """
-    replay_env = TetrisEnv(render_mode="human", cell_size=28)
+    replay_env = TetrisEnv(render_mode="human", cell_size=28, use_action_masking=True)
     
     try:
         obs, _ = replay_env.reset()
@@ -47,11 +47,11 @@ def replay_episode(actions, delay_ms=100):
                 break
         
         # Pausa final para ver el resultado
-        print(f"\n✓ Reproducción completada. Score final: {info.get('score', 0)}")
+        print(f"\nReproduccion completada. Score final: {info.get('score', 0)}")
         pygame_delay(3000)
-        
+
     except KeyboardInterrupt:
-        print("\n⚠️  Reproducción interrumpida")
+        print("\nReproduccion interrumpida")
     finally:
         replay_env.close()
 
@@ -81,24 +81,28 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
     if use_tensorboard:
         writer = SummaryWriter(f"{run_dir}/tensorboard")
 
-    # Entorno y agente
-    env = TetrisEnv()
-    agent = DQNAgent(env, lr=0.0001, gamma=0.99, epsilon=1.0,
-                     epsilon_decay=0.995, batch_size=32)
+    # Entorno y agente con action masking y mejoras
+    env = TetrisEnv(use_action_masking=True)
+    agent = DQNAgent(env, lr=0.00025, gamma=0.99, epsilon=1.0,
+                     epsilon_min=0.05, epsilon_decay=0.9995,
+                     buffer_size=50000, batch_size=64,
+                     target_update=1000, use_double_dqn=True)
 
-    # Guardar configuración del entrenamiento
+    # Guardar configuracion del entrenamiento
     config = {
         'timestamp': timestamp,
         'episodes': episodes,
-        'lr': 0.0001,
+        'lr': 0.00025,
         'gamma': 0.99,
         'epsilon_start': 1.0,
-        'epsilon_decay': 0.995,
+        'epsilon_decay': 0.9995,
         'epsilon_min': agent.epsilon_min,
-        'batch_size': 32,
+        'batch_size': 64,
         'buffer_size': agent.memory.maxlen,
         'target_update': agent.target_update,
-        'device': str(agent.device)
+        'device': str(agent.device),
+        'use_double_dqn': agent.use_double_dqn,
+        'use_action_masking': True
     }
     with open(f"{run_dir}/config.json", 'w') as f:
         json.dump(config, f, indent=4)
@@ -146,7 +150,7 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
             visualize = (ep + 1) % visual_interval == 0
 
             if visualize and visual_env is None:
-                visual_env = TetrisEnv(render_mode="human", cell_size=24)
+                visual_env = TetrisEnv(render_mode="human", cell_size=24, use_action_masking=True)
 
             # Usar entorno visual o normal
             current_env = visual_env if visualize else env
@@ -164,10 +168,15 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                 current_env.render()
 
             while not done:
-                # Seleccionar acción y obtener Q-value
-                action = agent.select_action(obs, training=True)
+                # Obtener acciones validas si action masking esta habilitado
+                valid_actions = None
+                if hasattr(current_env, 'use_action_masking') and current_env.use_action_masking:
+                    valid_actions = current_env.get_valid_actions()
 
-                # Calcular Q-value promedio para análisis
+                # Seleccionar accion
+                action = agent.select_action(obs, training=True, valid_actions=valid_actions)
+
+                # Calcular Q-value promedio para analisis
                 with torch.no_grad():
                     state_tensor = torch.FloatTensor(obs).unsqueeze(0).to(agent.device)
                     q_vals = agent.policy_net(state_tensor)

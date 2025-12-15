@@ -59,12 +59,20 @@ class MCTSAgent:
         self.max_profundidad = max_profundidad
     
     def obtener_acciones(self):
-        acciones = []
-        for col in range(self.env.cols):
-            for rot in range(4):
-                accion = col * 4 + rot
-                acciones.append(accion)
-        return acciones
+        """
+        Obtener acciones validas usando el metodo del environment si esta disponible.
+        Fallback al metodo original si no hay action masking.
+        """
+        if hasattr(self.env, 'get_valid_actions') and hasattr(self.env, 'use_action_masking') and self.env.use_action_masking:
+            return self.env.get_valid_actions()
+        else:
+            # Metodo original: todas las combinaciones de columna y rotacion
+            acciones = []
+            for col in range(self.env.cols):
+                for rot in range(4):
+                    accion = col * 4 + rot
+                    acciones.append(accion)
+            return acciones
     
     def seleccionar_accion(self, obs):
         raiz = Nodo(estado=obs)
