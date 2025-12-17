@@ -8,6 +8,10 @@ from envs.tetris_env import TetrisEnv
 from agents.dqn_agent import DQNAgent
 from utils.parallel_env import ParallelEnv
 
+def make_env():
+    """Funcion para crear entorno (debe estar en top-level para pickle en Windows)."""
+    return TetrisEnv(use_action_masking=True)
+
 def test_parallel_env():
     """
     Prueba rapida del entrenamiento paralelo.
@@ -20,11 +24,10 @@ def test_parallel_env():
     test_episodes = 20
 
     # Crear entornos paralelos
-    env_fn = lambda: TetrisEnv(use_action_masking=True)
-    parallel_envs = ParallelEnv(env_fn, num_envs=num_envs)
+    parallel_envs = ParallelEnv(make_env, num_envs=num_envs)
 
     # Crear agente
-    single_env = env_fn()
+    single_env = make_env()
     agent = DQNAgent(
         single_env,
         lr=0.00025,

@@ -10,16 +10,12 @@ from envs.tetris_env import TetrisEnv
 from agents.dqn_agent import DQNAgent
 from utils.parallel_env import ParallelEnv
 
-def train_dqn_parallel(episodes=2000, num_parallel_envs=8, save_interval=500):
-    """
-    Entrena DQN usando multiples entornos en paralelo.
-    Acelera el entrenamiento 5-10x aprovechando multi-core CPU y batch inference en GPU.
+def make_env():
+    # Crea entorno (top-level para pickle en Windows)
+    return TetrisEnv(use_action_masking=True)
 
-    Args:
-        episodes: numero total de episodios a entrenar
-        num_parallel_envs: cantidad de entornos ejecutandose en paralelo
-        save_interval: cada cuantos episodios guardar el modelo
-    """
+def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
+    # Entrena DQN con multiples entornos en paralelo
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"results/dqn_parallel_{timestamp}"
     os.makedirs(results_dir, exist_ok=True)
@@ -33,29 +29,29 @@ def train_dqn_parallel(episodes=2000, num_parallel_envs=8, save_interval=500):
     print("="*70)
 
     # Crear entornos paralelos
-    env_fn = lambda: TetrisEnv(use_action_masking=True)
-    parallel_envs = ParallelEnv(env_fn, num_envs=num_parallel_envs)
+    parallel_envs = ParallelEnv(make_env, num_envs=num_parallel_envs)
 
     # Crear agente con un entorno de referencia
-    single_env = env_fn()
+    single_env = make_env()
     agent = DQNAgent(
         single_env,
         lr=0.00025,
         gamma=0.99,
         epsilon=1.0,
-        epsilon_min=0.05,
+        epsilon_min=0.1,
         epsilon_decay=0.9995,
-        buffer_size=50000,
-        batch_size=64,
-        target_update=1000,
+        buffer_size=100000,
+        batch_size=128,
+        target_update=5000,
         use_double_dqn=True
     )
 
     print(f"\nConfiguracion del agente:")
     print(f"  Device: {agent.device}")
     print(f"  Learning rate: 0.00025")
-    print(f"  Buffer size: 50000")
-    print(f"  Batch size: 64")
+    print(f"  Buffer size: 100000")
+    print(f"  Batch size: 128 (optimizado para tensor cores)")
+    print(f"  Mixed precision: FP16 {'Activado' if agent.scaler else 'Desactivado'}")
     print(f"  Target update: 1000 pasos")
     print(f"  Double DQN: True")
     print(f"  Action masking: True")
@@ -130,11 +126,13 @@ def train_dqn_parallel(episodes=2000, num_parallel_envs=8, save_interval=500):
                     avg_time = np.mean(metrics['computation_time'][-50:])
                     avg_loss = np.mean(metrics['losses'][-50:]) if metrics['losses'] else 0
 
-                    print(f"Ep {episode_count:4d}/{episodes}: "
-                          f"Score={infos[i]['score']:6.1f} (avg={avg_score:6.1f}), "
-                          f"Lines={infos[i]['lines']:2d} (avg={avg_lines:4.1f}), "
-                          f"Loss={avg_loss:.3f}, "
-                          f"Time={avg_time:.2f}s, "
+                    # Calcular ETA
+                    elapsed = time.time() - overall_start
+                    eta = (elapsed / episode_count) * (episodes - episode_count)
+
+                    print(f"DQN | Ep {episode_count}/{episodes} | "
+                          f"{elapsed/60:.1f}min | ETA: {eta/60:.1f}min | "
+                          f"Score: {avg_score:.1f} | Lines: {avg_lines:.1f} | "
                           f"ε={agent.epsilon:.3f}")
 
                 # Guardar modelo intermedio
@@ -176,6 +174,19 @@ def train_dqn_parallel(episodes=2000, num_parallel_envs=8, save_interval=500):
     with open(metrics_path, 'w') as f:
         json.dump({k: [float(v) for v in vals] for k, vals in metrics.items()}, f, indent=2)
 
+    # Guardar metricas en CSV
+    import pandas as pd
+    df = pd.DataFrame({
+        'episode': list(range(1, len(metrics['scores'])+1)),
+        'score': metrics['scores'],
+        'lines': metrics['lines'],
+        'pieces': metrics['pieces'],
+        'reward': metrics['rewards']
+    })
+    csv_path = os.path.join(results_dir, 'dqn_parallel_metrics.csv')
+    df.to_csv(csv_path, index=False)
+    print(f"\nCSV guardado: {csv_path}")
+
     # Guardar configuracion
     config = {
         'episodes': episodes,
@@ -216,9 +227,9 @@ def train_dqn_parallel(episodes=2000, num_parallel_envs=8, save_interval=500):
     return agent, metrics
 
 if __name__ == "__main__":
-    # Entrenar con 8 entornos en paralelo (ajustar segun CPU disponibles)
+    # Entrenar con 8 entornos en paralelo
     agent, metrics = train_dqn_parallel(
-        episodes=2000,
+        episodes=1500,
         num_parallel_envs=8,
         save_interval=500
     )

@@ -11,18 +11,7 @@ from agents.expert_generator import MCTSExpertGenerator
 
 def train_hybrid(episodes=1500, pretrain_episodes=500, expert_data_episodes=100,
                  use_existing_data=False, expert_data_path=None):
-    """
-    Entrena agente hibrido MCTS-DQN en dos fases:
-    1. Pre-entrenamiento: aprendizaje por imitacion puro
-    2. Fine-tuning: combinacion de imitacion + RL
-
-    Args:
-        episodes: episodios de fine-tuning con RL
-        pretrain_episodes: episodios de pre-entrenamiento con imitacion
-        expert_data_episodes: episodios a generar con MCTS
-        use_existing_data: usar datos expertos existentes
-        expert_data_path: ruta a datos expertos (si use_existing_data=True)
-    """
+    # Entrena agente hibrido: pre-training con imitacion + fine-tuning con RL
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"results/hybrid_{timestamp}"
     os.makedirs(results_dir, exist_ok=True)
@@ -183,6 +172,21 @@ def train_hybrid(episodes=1500, pretrain_episodes=500, expert_data_episodes=100,
     metrics_path = os.path.join(results_dir, "metrics.json")
     with open(metrics_path, 'w') as f:
         json.dump({k: [float(v) for v in vals] for k, vals in metrics.items()}, f, indent=2)
+
+    # Guardar metricas en CSV
+    import pandas as pd
+    df = pd.DataFrame({
+        'episode': list(range(1, len(metrics['scores'])+1)),
+        'score': metrics['scores'],
+        'lines': metrics['lines'],
+        'reward': metrics['rewards'],
+        'total_loss': metrics['total_losses'],
+        'imitation_weight': metrics['imitation_weights']
+    })
+
+    csv_path = os.path.join(results_dir, 'hybrid_metrics.csv')
+    df.to_csv(csv_path, index=False)
+    print(f"\nCSV guardado: {csv_path}")
 
     # Resumen final
     print("\n" + "="*70)

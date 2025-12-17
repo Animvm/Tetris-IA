@@ -49,18 +49,21 @@ class DQN(nn.Module):
 class DQNAgent:
     """
     Agente DQN con mejoras criticas:
-    - Buffer mas grande (50k vs 10k original)
-    - Target network actualizado menos frecuente (1000 pasos vs 10 original)
-    - Epsilon decay mas lento para mejor exploracion
+    - Buffer mas grande (100k para paralelismo)
+    - Target network actualizado menos frecuente (5000 pasos para estabilidad)
+    - Epsilon decay muy lento (0.99998) optimizado para 8 entornos paralelos
+    - Epsilon min 0.1 para mantener exploracion continua
+    - Batch size 128 para mejor uso de GPU
+    - Mixed precision (FP16) para aprovechar tensor cores
     - Double DQN para reducir overestimation
     """
     def __init__(self, env, lr=0.00025, gamma=0.99, epsilon=1.0,
-                 epsilon_min=0.05, epsilon_decay=0.9995, buffer_size=50000,
-                 batch_size=64, target_update=1000, use_double_dqn=True):
+                 epsilon_min=0.1, epsilon_decay=0.9995, buffer_size=100000,
+                 batch_size=128, target_update=5000, use_double_dqn=True):
         self.env = env
         self.n_actions = env.action_space.n
         self.input_shape = env.observation_space.shape
-        
+
         self.gamma = gamma
         self.epsilon = epsilon
         self.epsilon_min = epsilon_min
@@ -70,16 +73,19 @@ class DQNAgent:
         self.use_double_dqn = use_double_dqn
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         # Networks
         self.policy_net = DQN(self.input_shape, self.n_actions).to(self.device)
         self.target_net = DQN(self.input_shape, self.n_actions).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
         self.target_net.eval()
-        
+
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.memory = deque(maxlen=buffer_size)
-        
+
+        # Mixed precision training para aprovechar tensor cores
+        self.scaler = torch.amp.GradScaler('cuda') if self.device.type == 'cuda' else None
+
         self.steps = 0
         
     def select_action(self, state, training=True, valid_actions=None):
@@ -177,49 +183,70 @@ class DQNAgent:
     def train_step(self):
         if len(self.memory) < self.batch_size:
             return 0.0
-        
+
         batch = random.sample(self.memory, self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
-        
+
         states = torch.FloatTensor(np.array(states)).to(self.device)
         actions = torch.LongTensor(actions).to(self.device)
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.FloatTensor(dones).to(self.device)
-        
-        # Valores Q actuales
-        current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
 
-        # Valores Q objetivo (target)
-        with torch.no_grad():
-            if self.use_double_dqn:
-                # Double DQN: seleccionar accion con policy net, evaluar con target net
-                # Reduce overestimation bias
-                next_actions = self.policy_net(next_states).argmax(1)
-                next_q = self.target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze()
-            else:
-                # DQN estandar
-                next_q = self.target_net(next_states).max(1)[0]
-            target_q = rewards + (1 - dones) * self.gamma * next_q
-        
-        # Loss
-        loss = nn.MSELoss()(current_q.squeeze(), target_q)
-        
-        # Optimize
-        self.optimizer.zero_grad()
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
-        self.optimizer.step()
-        
+        # Forward pass con mixed precision (FP16) si GPU disponible
+        if self.scaler is not None:
+            # Modo FP16 para aprovechar tensor cores
+            with torch.amp.autocast('cuda'):
+                # Valores Q actuales
+                current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
+
+                # Valores Q objetivo (target)
+                with torch.no_grad():
+                    if self.use_double_dqn:
+                        next_actions = self.policy_net(next_states).argmax(1)
+                        next_q = self.target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze()
+                    else:
+                        next_q = self.target_net(next_states).max(1)[0]
+                    target_q = rewards + (1 - dones) * self.gamma * next_q
+
+                # Loss
+                loss = nn.MSELoss()(current_q.squeeze(), target_q)
+
+            # Backward con gradient scaling
+            self.optimizer.zero_grad()
+            self.scaler.scale(loss).backward()
+            self.scaler.unscale_(self.optimizer)
+            torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+        else:
+            # Modo FP32 normal (sin GPU o CPU)
+            current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
+
+            with torch.no_grad():
+                if self.use_double_dqn:
+                    next_actions = self.policy_net(next_states).argmax(1)
+                    next_q = self.target_net(next_states).gather(1, next_actions.unsqueeze(1)).squeeze()
+                else:
+                    next_q = self.target_net(next_states).max(1)[0]
+                target_q = rewards + (1 - dones) * self.gamma * next_q
+
+            loss = nn.MSELoss()(current_q.squeeze(), target_q)
+
+            self.optimizer.zero_grad()
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
+            self.optimizer.step()
+
         # Update target network
         self.steps += 1
         if self.steps % self.target_update == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
-        
+
         # Decay epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
-        
+
         return loss.item()
     
     def save(self, path):

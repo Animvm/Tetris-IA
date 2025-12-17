@@ -175,24 +175,39 @@ class TetrisEnv(gym.Env):
 
     def compute_shaped_reward(self, lines_cleared, board_before, board_after):
         """
-        Calcula recompensa con multiples componentes para mejor aprendizaje.
-        Combina recompensas por lineas limpiadas con heuristicas de calidad del tablero.
+        Reward shaping ORIENTADO A LINEAS: Incentiva completar filas, penaliza torres.
+
+        Filosofia: Guiar al agente hacia estrategias que completen lineas,
+        no solo evitar errores. Penaliza "torres" (bumpiness) y recompensa
+        filas casi completas.
 
         Componentes:
-        - Lineas limpiadas: +100 por linea (principal)
-        - Reduccion de altura: +2 por unidad reducida
-        - Penalizacion por huecos: -5 por cada hueco nuevo
-        - Penalizacion por bumpiness: -1 por incremento en variacion de alturas
-        - Recompensa base: +1 por colocacion valida
+        1. Lineas limpiadas: +100 por linea (recompensa PRINCIPAL)
+        2. Filas casi completas: +3 a +15 por fila con 7-9 bloques
+        3. Reducir altura maxima: +10 por unidad (FUERTE incentivo)
+        4. Crear huecos: -3 por hueco (penalizacion moderada)
+        5. Bumpiness (rugosidad): -0.5 por unidad de diferencia entre columnas
+        6. Altura critica: -5 por fila sobre 15 (progresivo)
         """
-        reward = lines_cleared * 100
+        reward = 1  # Base minima por sobrevivir
+
+        # ===== RECOMPENSA PRINCIPAL: LINEAS LIMPIADAS =====
+        if lines_cleared > 0:
+            reward += lines_cleared * 100
+            # Bonus exponencial por multiples lineas (incentivar Tetris)
+            if lines_cleared == 2:
+                reward += 50
+            elif lines_cleared == 3:
+                reward += 150
+            elif lines_cleared >= 4:
+                reward += 300
 
         def board_metrics(board):
+            """Calcula metricas del tablero."""
             heights = np.sum(board > 0, axis=0)
             max_height = np.max(heights) if heights.size > 0 else 0
-            avg_height = np.mean(heights) if heights.size > 0 else 0
 
-            # Contar huecos: celdas vacias debajo de bloques
+            # Contar huecos
             holes = 0
             for col in range(board.shape[1]):
                 found_block = False
@@ -202,21 +217,51 @@ class TetrisEnv(gym.Env):
                     elif found_block:
                         holes += 1
 
-            # Bumpiness: diferencia de altura entre columnas adyacentes
-            bumpiness = sum(abs(heights[i] - heights[i+1])
-                           for i in range(len(heights)-1))
+            # Calcular bumpiness (rugosidad entre columnas adyacentes)
+            bumpiness = 0
+            if len(heights) > 1:
+                bumpiness = np.sum(np.abs(heights[:-1] - heights[1:]))
 
-            return max_height, avg_height, holes, bumpiness
+            # Contar filas casi completas (incentivo para completar lineas)
+            near_complete_rows = 0
+            near_complete_bonus = 0
+            for row in board:
+                filled = np.sum(row > 0)
+                if filled >= 7:  # 7, 8 o 9 bloques (de 10 total)
+                    near_complete_rows += 1
+                    near_complete_bonus += (filled - 6) * 3  # +3/+6/+9 por fila
 
-        h_max_before, h_avg_before, holes_before, bump_before = board_metrics(board_before)
-        h_max_after, h_avg_after, holes_after, bump_after = board_metrics(board_after)
+            return max_height, holes, bumpiness, near_complete_bonus
 
-        # Recompensas por mejoras en el tablero
-        reward += (h_max_before - h_max_after) * 2
-        reward += (h_avg_before - h_avg_after) * 1
-        reward -= (holes_after - holes_before) * 5
-        reward -= (bump_after - bump_before) * 1
-        reward += 1
+        h_max_before, holes_before, bump_before, _ = board_metrics(board_before)
+        h_max_after, holes_after, bump_after, near_complete_bonus = board_metrics(board_after)
+
+        # ===== INCENTIVO: FILAS CASI COMPLETAS =====
+        # Recompensar tener filas con 7-9 bloques (cerca de completar)
+        reward += near_complete_bonus
+
+        # ===== CAMBIOS RELATIVOS (no estado absoluto) =====
+        height_change = h_max_after - h_max_before
+        holes_change = holes_after - holes_before
+        bump_change = bump_after - bump_before
+
+        # ===== BONUS FUERTE: REDUCIR ALTURA =====
+        # Incentivar limpiar lineas (reduce altura)
+        if height_change < 0:
+            reward += abs(height_change) * 10
+
+        # ===== PENALIZACION: CREAR HUECOS =====
+        if holes_change > 0:
+            reward -= holes_change * 2.5
+
+        # ===== PENALIZACION: AUMENTAR BUMPINESS (torres) =====
+        if bump_change > 0:
+            reward -= bump_change * 0.5
+
+        # ===== PENALIZACION: ALTURA CRITICA =====
+        if h_max_after > 15:
+            excess = min(h_max_after - 15, 5)
+            reward -= excess * 3
 
         return reward
 

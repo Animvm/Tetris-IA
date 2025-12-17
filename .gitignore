@@ -242,3 +242,6 @@ Thumbs.db
 *.bak
 *.swp
 *~
+
+# Documentacion de desarrollo (notas internas)
+docs/development/
