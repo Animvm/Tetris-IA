@@ -14,7 +14,7 @@ def make_env():
     # Crea entorno (top-level para pickle en Windows)
     return TetrisEnv(use_action_masking=True)
 
-def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
+def train_dqn_parallel(episodes=2000, num_parallel_envs=8, save_interval=500):
     # Entrena DQN con multiples entornos en paralelo
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_dir = f"results/dqn_parallel_{timestamp}"
@@ -23,6 +23,16 @@ def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
     print("="*70)
     print("ENTRENAMIENTO DQN PARALELO")
     print("="*70)
+
+    # Verificar CUDA
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"Memoria GPU: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    else:
+        print("WARNING: CUDA no disponible, usando CPU")
+
     print(f"Entornos paralelos: {num_parallel_envs}")
     print(f"Episodios totales: {episodes}")
     print(f"Resultados: {results_dir}")
@@ -39,9 +49,9 @@ def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
         gamma=0.99,
         epsilon=1.0,
         epsilon_min=0.1,
-        epsilon_decay=0.9995,
-        buffer_size=100000,
-        batch_size=128,
+        epsilon_decay=0.99995,  # Decay MUY lento para mas exploracion
+        buffer_size=200000,  # Buffer mas grande
+        batch_size=256,  # Batch mas grande para mejor aprendizaje
         target_update=5000,
         use_double_dqn=True
     )
@@ -49,10 +59,11 @@ def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
     print(f"\nConfiguracion del agente:")
     print(f"  Device: {agent.device}")
     print(f"  Learning rate: 0.00025")
-    print(f"  Buffer size: 100000")
-    print(f"  Batch size: 128 (optimizado para tensor cores)")
+    print(f"  Epsilon decay: 0.99995 (muy lento)")
+    print(f"  Buffer size: 200000")
+    print(f"  Batch size: 256 (optimizado para GPU)")
     print(f"  Mixed precision: FP16 {'Activado' if agent.scaler else 'Desactivado'}")
-    print(f"  Target update: 1000 pasos")
+    print(f"  Target update: 5000 pasos")
     print(f"  Double DQN: True")
     print(f"  Action masking: True")
 
@@ -192,11 +203,11 @@ def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
         'episodes': episodes,
         'num_parallel_envs': num_parallel_envs,
         'learning_rate': 0.00025,
-        'buffer_size': 50000,
-        'batch_size': 64,
-        'target_update': 1000,
-        'epsilon_decay': 0.9995,
-        'epsilon_min': 0.05,
+        'buffer_size': 200000,
+        'batch_size': 256,
+        'target_update': 5000,
+        'epsilon_decay': 0.99995,
+        'epsilon_min': 0.1,
         'use_double_dqn': True,
         'use_action_masking': True,
         'total_training_time': total_time,
@@ -229,7 +240,7 @@ def train_dqn_parallel(episodes=1500, num_parallel_envs=8, save_interval=500):
 if __name__ == "__main__":
     # Entrenar con 8 entornos en paralelo
     agent, metrics = train_dqn_parallel(
-        episodes=1500,
+        episodes=2000,
         num_parallel_envs=8,
         save_interval=500
     )

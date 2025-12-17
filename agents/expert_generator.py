@@ -11,7 +11,7 @@ class MCTSExpertGenerator:
 
     def __init__(self, env, num_simulations=200, save_dir="data/expert_demos"):
         self.env = env
-        self.mcts = MCTSAgent(env, num_simulations=num_simulations, max_profundidad=10)
+        self.mcts = MCTSAgent(env, num_simulaciones=num_simulations, max_profundidad=10)
         self.save_dir = save_dir
         os.makedirs(save_dir, exist_ok=True)
 

@@ -4,6 +4,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import time
 import numpy as np
+import torch
 from datetime import datetime
 from envs.tetris_env import TetrisEnv
 from agents.hybrid_dqn_agent import HybridDQNAgent
@@ -19,6 +20,16 @@ def train_hybrid(episodes=1500, pretrain_episodes=500, expert_data_episodes=100,
     print("="*70)
     print("ENTRENAMIENTO HIBRIDO MCTS-DQN")
     print("="*70)
+
+    # Verificar CUDA
+    cuda_available = torch.cuda.is_available()
+    if cuda_available:
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"CUDA Version: {torch.version.cuda}")
+        print(f"Memoria GPU: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+    else:
+        print("WARNING: CUDA no disponible, usando CPU")
+
     print(f"Resultados: {results_dir}")
     print("="*70)
 
@@ -28,11 +39,11 @@ def train_hybrid(episodes=1500, pretrain_episodes=500, expert_data_episodes=100,
     else:
         print(f"\nPASO 1: Generando datos expertos con MCTS")
         print(f"Episodios a generar: {expert_data_episodes}")
-        print(f"Simulaciones MCTS: 200 por accion")
+        print(f"Simulaciones MCTS: 50 por accion (reducido para velocidad)")
         print("-"*70)
 
         env_expert = TetrisEnv(use_action_masking=True)
-        generator = MCTSExpertGenerator(env_expert, num_simulations=200,
+        generator = MCTSExpertGenerator(env_expert, num_simulations=50,
                                        save_dir="data/expert_demos")
 
         start_time = time.time()
@@ -61,11 +72,13 @@ def train_hybrid(episodes=1500, pretrain_episodes=500, expert_data_episodes=100,
         use_double_dqn=True
     )
 
-    print(f"Configuracion:")
+    print(f"Configuracion del agente:")
     print(f"  Device: {agent.device}")
     print(f"  Imitation weight inicial: {agent.imitation_weight}")
     print(f"  Buffer experto: {len(agent.expert_memory)} transiciones")
     print(f"  Buffer propio: {len(agent.memory)} transiciones")
+    print(f"  Learning rate: {agent.optimizer.param_groups[0]['lr']}")
+    print(f"  Mixed precision: FP16 {'Activado' if agent.scaler else 'Desactivado'}")
 
     # Paso 3: Pre-entrenamiento (imitacion pura)
     print(f"\nPASO 3: Pre-entrenamiento por imitacion")
@@ -209,7 +222,7 @@ if __name__ == "__main__":
     agent, metrics = train_hybrid(
         episodes=1500,
         pretrain_episodes=500,
-        expert_data_episodes=100,
+        expert_data_episodes=30,  # Reducido de 100 a 30 para velocidad
         use_existing_data=False
     )
 
