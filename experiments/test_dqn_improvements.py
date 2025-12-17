@@ -7,17 +7,11 @@ from agents.dqn_agent import DQNAgent
 import numpy as np
 
 def test_improved_dqn():
-    """
-    Prueba rapida del DQN mejorado.
-    Verifica que reward shaping, action masking y arquitectura funcionan correctamente.
-    """
     print("Probando DQN mejorado...")
     print("="*60)
 
-    # Crear entorno con action masking
     env = TetrisEnv(use_action_masking=True)
 
-    # Crear agente con nuevos hiperparametros
     agent = DQNAgent(
         env,
         lr=0.00025,
@@ -53,20 +47,15 @@ def test_improved_dqn():
         steps = 0
 
         while not done and steps < 100:
-            # Obtener acciones validas
             valid_actions = env.get_valid_actions()
 
-            # Seleccionar accion
             action = agent.select_action(obs, training=True, valid_actions=valid_actions)
 
-            # Ejecutar accion
             next_obs, reward, terminated, truncated, info = env.step(action)
             done = terminated or truncated
 
-            # Almacenar transicion
             agent.store_transition(obs, action, reward, next_obs, done)
 
-            # Entrenar si hay suficientes muestras
             if len(agent.memory) >= agent.batch_size:
                 agent.train_step()
 

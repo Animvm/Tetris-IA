@@ -1,7 +1,6 @@
 import sys
 sys.path.append('.')
 
-# train_dqn.py
 import time
 import pygame
 import numpy as np
@@ -14,8 +13,8 @@ import json
 from datetime import datetime
 from torch.utils.tensorboard import SummaryWriter
 
+# espera con pygame para visualizacion
 def pygame_delay(ms):
-    """Small helper to keep the window responsive while waiting"""
     start = pygame.time.get_ticks()
     while pygame.time.get_ticks() - start < ms:
         for event in pygame.event.get():
@@ -23,30 +22,23 @@ def pygame_delay(ms):
                 raise KeyboardInterrupt
         pygame.time.delay(10)
 
+# reproduce un episodio visualmente
 def replay_episode(actions, delay_ms=100):
-    """
-    Reproducir un episodio usando las acciones guardadas
-
-    Args:
-        actions: lista de acciones a reproducir
-        delay_ms: delay entre pasos (ms)
-    """
     replay_env = TetrisEnv(render_mode="human", cell_size=28, use_action_masking=True)
-    
+
     try:
         obs, _ = replay_env.reset()
         replay_env.render()
-        pygame_delay(1000)  # Pausa inicial
-        
+        pygame_delay(1000)
+
         for step, action in enumerate(actions):
             obs, reward, done, truncated, info = replay_env.step(action)
             replay_env.render()
             pygame_delay(delay_ms)
-            
+
             if done:
                 break
-        
-        # Pausa final para ver el resultado
+
         print(f"\nReproduccion completada. Score final: {info.get('score', 0)}")
         pygame_delay(3000)
 
@@ -55,40 +47,25 @@ def replay_episode(actions, delay_ms=100):
     finally:
         replay_env.close()
 
+# entrena agente DQN con visualizacion y metricas
 def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_best=True,
         checkpoint_interval=100, use_tensorboard=True):
-    """
-    Entrenar DQN con visualización periódica y logging detallado
-
-    Args:
-        episodes: número total de episodios
-        visual_interval: cada cuántos episodios mostrar visualización
-        delay_ms: delay entre pasos en visualización (ms)
-        save_model: si guardar el modelo entrenado
-        replay_best: si reproducir el mejor episodio al finalizar
-        checkpoint_interval: cada cuántos episodios guardar checkpoint
-        use_tensorboard: si usar TensorBoard para logging
-    """
-    # Crear directorios con timestamp
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = f"results/run_{timestamp}"
     os.makedirs(run_dir, exist_ok=True)
     os.makedirs(f"{run_dir}/checkpoints", exist_ok=True)
     os.makedirs("models", exist_ok=True)
 
-    # Inicializar TensorBoard
     writer = None
     if use_tensorboard:
         writer = SummaryWriter(f"{run_dir}/tensorboard")
 
-    # Entorno y agente con action masking y mejoras
     env = TetrisEnv(use_action_masking=True)
     agent = DQNAgent(env, lr=0.00025, gamma=0.99, epsilon=1.0,
                      epsilon_min=0.05, epsilon_decay=0.9995,
                      buffer_size=50000, batch_size=64,
                      target_update=1000, use_double_dqn=True)
 
-    # Guardar configuracion del entrenamiento
     config = {
         'timestamp': timestamp,
         'episodes': episodes,
@@ -107,10 +84,8 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
     with open(f"{run_dir}/config.json", 'w') as f:
         json.dump(config, f, indent=4)
 
-    # Entorno visual (se crea solo cuando se necesita)
     visual_env = None
 
-    # Métricas detalladas
     rewards = []
     lines = []
     losses = []
@@ -119,7 +94,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
     episode_lengths = []
     q_values_avg = []
 
-    # Tracking del mejor episodio
     best_episode = {
         'episode': 0,
         'score': -float('inf'),
@@ -127,7 +101,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         'actions': []
     }
 
-    # Inicializar archivo de log CSV
     log_file = f"{run_dir}/training_log.csv"
     with open(log_file, 'w') as f:
         f.write("episode,reward,score,lines,pieces,steps,avg_loss,epsilon,q_value_avg,timestamp\n")
@@ -141,18 +114,16 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
     if use_tensorboard:
         print(f"TensorBoard: tensorboard --logdir={run_dir}/tensorboard")
     print("="*70 + "\n")
-    
+
     start_time = time.time()
 
     try:
         for ep in range(episodes):
-            # Determinar si este episodio se visualiza
             visualize = (ep + 1) % visual_interval == 0
 
             if visualize and visual_env is None:
                 visual_env = TetrisEnv(render_mode="human", cell_size=24, use_action_masking=True)
 
-            # Usar entorno visual o normal
             current_env = visual_env if visualize else env
 
             obs, _ = current_env.reset()
@@ -168,15 +139,12 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                 current_env.render()
 
             while not done:
-                # Obtener acciones validas si action masking esta habilitado
                 valid_actions = None
                 if hasattr(current_env, 'use_action_masking') and current_env.use_action_masking:
                     valid_actions = current_env.get_valid_actions()
 
-                # Seleccionar accion
                 action = agent.select_action(obs, training=True, valid_actions=valid_actions)
 
-                # Calcular Q-value promedio para analisis
                 with torch.no_grad():
                     state_tensor = torch.FloatTensor(obs).unsqueeze(0).to(agent.device)
                     q_vals = agent.policy_net(state_tensor)
@@ -185,10 +153,8 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                 episode_actions.append(action)
                 next_obs, reward, done, truncated, info = current_env.step(action)
 
-                # Almacenar transición
                 agent.store_transition(obs, action, reward, next_obs, done)
 
-                # Entrenar
                 loss = agent.train_step()
                 if loss > 0:
                     episode_loss.append(loss)
@@ -202,7 +168,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                     current_env.render()
                     pygame_delay(delay_ms)
 
-            # Registrar métricas
             episode_score = info.get('score', total_r)
             avg_loss = np.mean(episode_loss) if episode_loss else 0
             avg_q = np.mean(episode_q_values) if episode_q_values else 0
@@ -215,13 +180,11 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
             episode_lengths.append(steps)
             q_values_avg.append(avg_q)
 
-            # Logging a CSV
             with open(log_file, 'a') as f:
                 timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 f.write(f"{ep+1},{total_r},{episode_score},{total_lines},{steps},{steps},"
                        f"{avg_loss},{agent.epsilon},{avg_q},{timestamp_str}\n")
 
-            # TensorBoard logging
             if writer:
                 writer.add_scalar('Training/Reward', total_r, ep)
                 writer.add_scalar('Training/Score', episode_score, ep)
@@ -231,7 +194,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                 writer.add_scalar('Training/Steps', steps, ep)
                 writer.add_scalar('Training/Avg_Q_Value', avg_q, ep)
 
-                # Promedios móviles
                 if len(rewards) >= 10:
                     writer.add_scalar('Training/Reward_MA10', np.mean(rewards[-10:]), ep)
                     writer.add_scalar('Training/Score_MA10', np.mean(scores[-10:]), ep)
@@ -240,7 +202,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                     writer.add_scalar('Training/Reward_MA50', np.mean(rewards[-50:]), ep)
                     writer.add_scalar('Training/Score_MA50', np.mean(scores[-50:]), ep)
 
-            # Actualizar mejor episodio
             if episode_score > best_episode['score']:
                 best_episode = {
                     'episode': ep + 1,
@@ -249,12 +210,10 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                     'actions': episode_actions.copy(),
                     'reward': total_r
                 }
-                print(f"  🌟 ¡Nuevo mejor episodio! Score: {episode_score}, Líneas: {total_lines}")
+                print(f"  Nuevo mejor episodio! Score: {episode_score}, Líneas: {total_lines}")
 
-                # Guardar mejor modelo
                 agent.save(f"{run_dir}/checkpoints/best_model.pth")
 
-            # Logging en consola
             if (ep + 1) % 10 == 0 or visualize:
                 elapsed = time.time() - start_time
                 eps_per_sec = (ep + 1) / elapsed
@@ -264,32 +223,27 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
                       f"Loss: {avg_loss:.4f} | ε: {agent.epsilon:.3f} | "
                       f"ETA: {int(eta//60)}m {int(eta%60)}s")
 
-            # Guardar checkpoint periódico
             if (ep + 1) % checkpoint_interval == 0:
                 checkpoint_path = f"{run_dir}/checkpoints/model_ep{ep+1}.pth"
                 agent.save(checkpoint_path)
-                print(f"  💾 Checkpoint guardado: {checkpoint_path}")
-        
+                print(f"  Checkpoint guardado: {checkpoint_path}")
+
         print("\n" + "="*70)
         print("¡ENTRENAMIENTO COMPLETADO!")
         print("="*70)
 
-        # Guardar modelo final
         if save_model:
             model_path = "models/dqn_tetris_final.pth"
             agent.save(model_path)
             agent.save(f"{run_dir}/final_model.pth")
-            print(f"✓ Modelo final guardado en {model_path}")
+            print(f"Modelo final guardado en {model_path}")
 
-        # Cerrar TensorBoard
         if writer:
             writer.close()
 
-        # Generar gráficos detallados
         print("\nGenerando gráficos de análisis...")
         import matplotlib.pyplot as plt
 
-        # Gráfico 1: Rewards y Scores
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         episodes_arr = np.arange(1, len(rewards) + 1)
@@ -323,7 +277,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         plt.savefig(f"{run_dir}/rewards_scores.png", dpi=150)
         plt.close()
 
-        # Gráfico 2: Líneas y Piezas
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         ax1.plot(episodes_arr, lines, alpha=0.2, label='Lines', color='purple')
@@ -349,7 +302,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         plt.savefig(f"{run_dir}/lines_pieces.png", dpi=150)
         plt.close()
 
-        # Gráfico 3: Loss y Epsilon
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
 
         ax1.plot(episodes_arr, losses, alpha=0.2, label='Loss', color='red')
@@ -374,7 +326,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         plt.savefig(f"{run_dir}/loss_epsilon.png", dpi=150)
         plt.close()
 
-        # Gráfico 4: Q-values
         fig, ax = plt.subplots(1, 1, figsize=(12, 5))
         ax.plot(episodes_arr, q_values_avg, alpha=0.2, label='Avg Q-value', color='cyan')
         if len(q_values_avg) >= 50:
@@ -389,7 +340,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         plt.savefig(f"{run_dir}/q_values.png", dpi=150)
         plt.close()
 
-        # Generar resumen de estadísticas
         summary = {
             'training_time': time.time() - start_time,
             'total_episodes': episodes,
@@ -409,7 +359,6 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         with open(f"{run_dir}/summary.json", 'w') as f:
             json.dump(summary, f, indent=4)
 
-        # Imprimir resumen
         print("\n" + "="*70)
         print("RESUMEN DEL ENTRENAMIENTO")
         print("="*70)
@@ -429,11 +378,10 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
         print(f"\nEpsilon final: {summary['final_epsilon']:.4f}")
         print(f"\n📁 Resultados guardados en: {run_dir}")
         print("="*70)
-        
-        # Reproducir mejor episodio
+
         if replay_best and best_episode['episode'] > 0:
             print("\n" + "="*70)
-            print(f"  🏆 REPRODUCIENDO MEJOR EPISODIO")
+            print(f"  REPRODUCIENDO MEJOR EPISODIO")
             print("="*70)
             print(f"Episodio: {best_episode['episode']}/{episodes}")
             print(f"Score: {best_episode['score']}")
@@ -441,21 +389,20 @@ def run(episodes=500, visual_interval=50, delay_ms=50, save_model=True, replay_b
             print(f"Reward: {best_episode['reward']:.1f}")
             print("="*70)
             input("\nPresiona ENTER para ver la reproducción...")
-            
+
             replay_episode(best_episode['actions'], delay_ms=80)
-        
+
     except KeyboardInterrupt:
         print("\n\nEntrenamiento interrumpido por el usuario.")
         if save_model:
             model_path = "models/dqn_tetris_interrupted.pth"
             agent.save(model_path)
             print(f"Modelo parcial guardado en {model_path}")
-    
+
     finally:
         if visual_env is not None:
             visual_env.close()
         env.close()
 
 if __name__ == "__main__":
-    # Configuración de entrenamiento
     run(episodes=500, visual_interval=50, delay_ms=30, save_model=True, replay_best=True)

@@ -20,7 +20,7 @@ while not terminado and pasos < 20:
     recompensa_total += recompensa
     terminado = term or trunc
     pasos += 1
-    
+
     if pasos % 5 == 0:
         print(f"Paso {pasos}: Puntaje={info['score']}, Lineas={info['lines']}")
 

@@ -2,27 +2,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+# calcula promedio movil de datos
 def moving_average(data, window):
-    """Calcula media movil con ventana especificada."""
     if len(data) < window:
         return data
     return np.convolve(data, np.ones(window)/window, mode='valid')
 
+# genera graficos comparativos entre agentes
 def plot_comparison(results_dict, save_dir):
-    """
-    Genera plots de comparacion entre agentes.
-
-    Args:
-        results_dict: dict con nombre_agente -> metrics
-        save_dir: directorio donde guardar plots
-    """
     os.makedirs(save_dir, exist_ok=True)
 
-    # Crear figura con 6 subplots
     fig, axes = plt.subplots(3, 2, figsize=(16, 12))
     fig.suptitle('Comparacion de Agentes Tetris IA', fontsize=16, fontweight='bold')
 
-    # Plot 1: Curvas de aprendizaje (score)
     for name, metrics in results_dict.items():
         episodes = range(1, len(metrics['scores']) + 1)
         window = min(50, len(metrics['scores']) // 10)
@@ -38,7 +30,6 @@ def plot_comparison(results_dict, save_dir):
     axes[0, 0].legend()
     axes[0, 0].grid(True, alpha=0.3)
 
-    # Plot 2: Lineas limpiadas
     for name, metrics in results_dict.items():
         episodes = range(1, len(metrics['lines']) + 1)
         window = min(50, len(metrics['lines']) // 10)
@@ -46,7 +37,7 @@ def plot_comparison(results_dict, save_dir):
             ma = moving_average(metrics['lines'], window)
             axes[0, 1].plot(episodes[window-1:], ma, label=name.upper(), linewidth=2)
         else:
-            axes[0, 1].plot(episodes, metrics['lines'], label=name.upper(), linewidth=2)
+            axes[0, 1].plot(episodes, metrics['lines'], label=name.UPPER(), linewidth=2)
 
     axes[0, 1].set_title('Lineas Limpiadas (Media Movil)', fontsize=12, fontweight='bold')
     axes[0, 1].set_xlabel('Episodio')
@@ -54,7 +45,6 @@ def plot_comparison(results_dict, save_dir):
     axes[0, 1].legend()
     axes[0, 1].grid(True, alpha=0.3)
 
-    # Plot 3: Sample efficiency (score acumulado)
     for name, metrics in results_dict.items():
         cumsum = np.cumsum(metrics['scores'])
         axes[1, 0].plot(cumsum, label=name.upper(), linewidth=2)
@@ -65,7 +55,6 @@ def plot_comparison(results_dict, save_dir):
     axes[1, 0].legend()
     axes[1, 0].grid(True, alpha=0.3)
 
-    # Plot 4: Tiempo computacional
     agents = list(results_dict.keys())
     comp_times = [np.mean(results_dict[a]['computation_time']) for a in agents]
     comp_stds = [np.std(results_dict[a]['computation_time']) for a in agents]
@@ -77,7 +66,6 @@ def plot_comparison(results_dict, save_dir):
     axes[1, 1].set_ylabel('Tiempo (segundos)')
     axes[1, 1].grid(True, alpha=0.3, axis='y')
 
-    # Plot 5: Performance final (ultimos 100 eps)
     final_scores = []
     final_stds = []
     for name in agents:
@@ -92,7 +80,6 @@ def plot_comparison(results_dict, save_dir):
     axes[2, 0].set_ylabel('Score Promedio')
     axes[2, 0].grid(True, alpha=0.3, axis='y')
 
-    # Plot 6: Piezas colocadas promedio
     final_pieces = []
     for name in agents:
         n = min(100, len(results_dict[name]['pieces']))
@@ -113,20 +100,12 @@ def plot_comparison(results_dict, save_dir):
     print(f"Plot de comparacion guardado: {save_path}")
 
 def plot_learning_curves_detailed(results_dict, save_dir):
-    """
-    Genera plots detallados de curvas de aprendizaje individuales.
-
-    Args:
-        results_dict: dict con nombre_agente -> metrics
-        save_dir: directorio donde guardar plots
-    """
     for name, metrics in results_dict.items():
         fig, axes = plt.subplots(2, 2, figsize=(14, 10))
         fig.suptitle(f'Curvas de Aprendizaje: {name.upper()}', fontsize=14, fontweight='bold')
 
         episodes = range(1, len(metrics['scores']) + 1)
 
-        # Score
         axes[0, 0].plot(episodes, metrics['scores'], alpha=0.3, color='blue')
         window = min(50, len(metrics['scores']) // 10)
         if len(metrics['scores']) > window:
@@ -137,7 +116,6 @@ def plot_learning_curves_detailed(results_dict, save_dir):
         axes[0, 0].set_ylabel('Score')
         axes[0, 0].grid(True, alpha=0.3)
 
-        # Lineas
         axes[0, 1].plot(episodes, metrics['lines'], alpha=0.3, color='green')
         if len(metrics['lines']) > window:
             ma = moving_average(metrics['lines'], window)
@@ -147,7 +125,6 @@ def plot_learning_curves_detailed(results_dict, save_dir):
         axes[0, 1].set_ylabel('Lineas')
         axes[0, 1].grid(True, alpha=0.3)
 
-        # Distribucion de scores
         axes[1, 0].hist(metrics['scores'], bins=30, alpha=0.7, color='blue', edgecolor='black')
         axes[1, 0].axvline(np.mean(metrics['scores']), color='red', linestyle='--',
                           linewidth=2, label=f'Media: {np.mean(metrics["scores"]):.1f}')
@@ -157,7 +134,6 @@ def plot_learning_curves_detailed(results_dict, save_dir):
         axes[1, 0].legend()
         axes[1, 0].grid(True, alpha=0.3)
 
-        # Piezas colocadas
         axes[1, 1].plot(episodes, metrics['pieces'], alpha=0.3, color='orange')
         if len(metrics['pieces']) > window:
             ma = moving_average(metrics['pieces'], window)

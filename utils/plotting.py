@@ -1,13 +1,14 @@
-# utils/plotting.py
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+# grafica metricas de entrenamiento con promedios moviles
 def plot_metrics(rewards, lines, window=50, savepath=None, title="Training progress"):
     episodes = np.arange(1, len(rewards)+1)
     rewards = np.array(rewards)
     lines = np.array(lines)
 
+    # calcula promedio movil
     def moving_avg(x, w):
         if len(x) < w:
             return np.convolve(x, np.ones(len(x))/len(x), mode='valid')

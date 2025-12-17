@@ -1,7 +1,3 @@
-"""
-Script para analizar resultados de entrenamientos DQN
-Uso: python experiments/analyze_training.py results/run_TIMESTAMP
-"""
 import sys
 sys.path.append('.')
 
@@ -12,13 +8,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
+# analiza resultados de entrenamiento y genera reportes
 def analyze_training(run_dir):
-    """
-    Analiza los resultados de un entrenamiento y genera reportes
-
-    Args:
-        run_dir: directorio con los resultados del entrenamiento
-    """
     run_path = Path(run_dir)
 
     if not run_path.exists():
@@ -259,8 +250,8 @@ def analyze_training(run_dir):
     with open(analysis_dir / "detailed_stats.json", 'w') as f:
         json.dump(stats, f, indent=4)
 
-    print(f"\n✓ Gráficos guardados en: {analysis_dir}")
-    print(f"✓ Estadísticas guardadas en: {analysis_dir / 'detailed_stats.json'}")
+    print(f"\nGráficos guardados en: {analysis_dir}")
+    print(f"Estadísticas guardadas en: {analysis_dir / 'detailed_stats.json'}")
     print("\n" + "="*80)
     print("ANÁLISIS COMPLETADO")
     print("="*80)

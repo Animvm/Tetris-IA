@@ -1,16 +1,17 @@
 import sys
 sys.path.append('.')
 
-# train_heuristic.py
 from envs.tetris_env import TetrisEnv
 from agents.heuristic_agent import HeuristicAgent
 from utils.plotting import plot_metrics
 
+# entrena y evalua agente heuristico
 def run(episodes=200):
     env = TetrisEnv()
     agent = HeuristicAgent(env)
     rewards = []
     lines = []
+    # ejecutar episodios de evaluacion
     for ep in range(episodes):
         obs, _ = env.reset()
         done = False

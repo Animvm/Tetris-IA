@@ -5,23 +5,17 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from envs.tetris_env import TetrisEnv, UNIQUE_ROTATIONS
 
 def test_action_masking():
-    """
-    Prueba que el action masking funcione correctamente.
-    Verifica que cada pieza retorne el numero esperado de acciones validas.
-    """
     print("Probando action masking...")
     print("="*60)
 
     env = TetrisEnv(use_action_masking=True)
 
-    # Probar cada tipo de pieza
     piece_types = ['O', 'I', 'S', 'Z', 'T', 'J', 'L']
 
     for piece_name in piece_types:
         env.current_piece_name = piece_name
         valid_actions = env.get_valid_actions()
 
-        # Calcular numero esperado de acciones
         max_rotations = UNIQUE_ROTATIONS[piece_name]
 
         print(f"\nPieza {piece_name}:")
@@ -29,17 +23,14 @@ def test_action_masking():
         print(f"  Acciones validas: {len(valid_actions)}")
         print(f"  Reduccion: {40 - len(valid_actions)} acciones eliminadas")
 
-        # Verificar que no haya acciones duplicadas
         assert len(valid_actions) == len(set(valid_actions)), "Acciones duplicadas encontradas"
 
-        # Verificar que todas las acciones esten en rango valido
         for action in valid_actions:
             assert 0 <= action < 40, f"Accion fuera de rango: {action}"
 
     print("\n" + "="*60)
     print("Todas las pruebas pasaron correctamente")
 
-    # Estadisticas generales
     env.reset()
     total_actions_before = 40
     total_actions_after = 0

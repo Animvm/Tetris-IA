@@ -1,12 +1,11 @@
-# Lee CSVs de los 3 agentes y genera graficos comparativos
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 from glob import glob
 
+# carga metricas de diferentes entrenamientos
 def load_metrics():
-    # Buscar CSV de DQN
     dqn_pattern = 'results/run_*/dqn_parallel_metrics.csv'
     dqn_files = glob(dqn_pattern)
     if not dqn_files:
@@ -14,7 +13,6 @@ def load_metrics():
         dqn_files = glob(dqn_pattern)
     dqn = pd.read_csv(dqn_files[0]) if dqn_files else None
 
-    # Cargar otros agentes
     mcts = pd.read_csv('results/mcts_metrics.csv') if os.path.exists('results/mcts_metrics.csv') else None
 
     hybrid_pattern = 'results/hybrid_*/hybrid_metrics.csv'
@@ -23,12 +21,11 @@ def load_metrics():
 
     return {'DQN': dqn, 'MCTS': mcts, 'Hybrid': hybrid}
 
+# grafica comparacion de scores
 def plot_scores(data):
-    # Grafico de scores vs episodios con media movil
     plt.figure(figsize=(12, 6))
     for name, df in data.items():
         if df is not None:
-            # Media movil de 10 episodios
             ma = df['score'].rolling(10, min_periods=1).mean()
             plt.plot(df['episode'], ma, label=name, linewidth=2)
 
@@ -41,7 +38,6 @@ def plot_scores(data):
     plt.close()
 
 def plot_lines(data):
-    # Grafico de lineas limpiadas
     plt.figure(figsize=(12, 6))
     for name, df in data.items():
         if df is not None:
@@ -57,10 +53,8 @@ def plot_lines(data):
     plt.close()
 
 def plot_boxplots(data):
-    # Box plots de distribucion
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
 
-    # Scores
     scores = [df['score'] for df in data.values() if df is not None]
     labels = [name for name, df in data.items() if df is not None]
     ax1.boxplot(scores, labels=labels)
@@ -68,7 +62,6 @@ def plot_boxplots(data):
     ax1.set_title('Distribucion de Scores')
     ax1.grid(True, alpha=0.3)
 
-    # Lines
     lines = [df['lines'] for df in data.values() if df is not None]
     ax2.boxplot(lines, labels=labels)
     ax2.set_ylabel('Lineas')
@@ -80,7 +73,6 @@ def plot_boxplots(data):
     plt.close()
 
 def generate_report(data):
-    # Reporte estadistico en texto
     with open('results/comparison_report.txt', 'w') as f:
         f.write("="*70 + "\n")
         f.write("COMPARACION DE AGENTES - TETRIS IA\n")
@@ -105,16 +97,16 @@ def main():
     data = load_metrics()
 
     plot_scores(data)
-    print("✓ Grafico de scores")
+    print("Grafico de scores")
 
     plot_lines(data)
-    print("✓ Grafico de lineas")
+    print("Grafico de lineas")
 
     plot_boxplots(data)
-    print("✓ Box plots")
+    print("Box plots")
 
     generate_report(data)
-    print("✓ Reporte estadistico")
+    print("Reporte estadistico")
 
     print(f"\nGraficos en: results/comparison_plots/")
     print(f"Reporte en: results/comparison_report.txt")

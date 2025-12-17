@@ -1,4 +1,3 @@
-# agents/dqn_agent.py
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,13 +5,11 @@ import torch.optim as optim
 from collections import deque
 import random
 
+# red neuronal para estimar valores Q
 class DQN(nn.Module):
-    """
-    Red neuronal convolucional para aproximar Q-values.
-    Arquitectura mejorada con batch normalization y dropout para mejor generalizacion.
-    """
     def __init__(self, input_shape, n_actions):
         super(DQN, self).__init__()
+        # capas convolucionales para procesar el tablero
         self.conv = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=3, stride=1, padding=1),
             nn.ReLU(),
@@ -25,9 +22,9 @@ class DQN(nn.Module):
             nn.BatchNorm2d(128)
         )
 
-        # Tamaño de salida de convolucion
         conv_out_size = input_shape[0] * input_shape[1] * 128
 
+        # capas densas para generar valores Q
         self.fc = nn.Sequential(
             nn.Linear(conv_out_size, 512),
             nn.ReLU(),
@@ -37,26 +34,17 @@ class DQN(nn.Module):
             nn.Dropout(0.2),
             nn.Linear(256, n_actions)
         )
-        
+
+    # procesa el estado y retorna valores Q
     def forward(self, x):
-        # x shape: (batch, height, width)
         if len(x.shape) == 3:
-            x = x.unsqueeze(1)  # Add channel dimension
+            x = x.unsqueeze(1)
         x = self.conv(x)
         x = x.view(x.size(0), -1)
         return self.fc(x)
 
+# agente que aprende a jugar usando DQN
 class DQNAgent:
-    """
-    Agente DQN con mejoras criticas:
-    - Buffer mas grande (100k para paralelismo)
-    - Target network actualizado menos frecuente (5000 pasos para estabilidad)
-    - Epsilon decay muy lento (0.99998) optimizado para 8 entornos paralelos
-    - Epsilon min 0.1 para mantener exploracion continua
-    - Batch size 128 para mejor uso de GPU
-    - Mixed precision (FP16) para aprovechar tensor cores
-    - Double DQN para reducir overestimation
-    """
     def __init__(self, env, lr=0.00025, gamma=0.99, epsilon=1.0,
                  epsilon_min=0.1, epsilon_decay=0.9995, buffer_size=100000,
                  batch_size=128, target_update=5000, use_double_dqn=True):
@@ -74,7 +62,6 @@ class DQNAgent:
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        # Networks
         self.policy_net = DQN(self.input_shape, self.n_actions).to(self.device)
         self.target_net = DQN(self.input_shape, self.n_actions).to(self.device)
         self.target_net.load_state_dict(self.policy_net.state_dict())
@@ -83,28 +70,24 @@ class DQNAgent:
         self.optimizer = optim.Adam(self.policy_net.parameters(), lr=lr)
         self.memory = deque(maxlen=buffer_size)
 
-        # Mixed precision training para aprovechar tensor cores
         self.scaler = torch.amp.GradScaler('cuda') if self.device.type == 'cuda' else None
 
         self.steps = 0
-        
+
+    # selecciona accion usando epsilon-greedy
     def select_action(self, state, training=True, valid_actions=None):
-        """
-        Selecciona una accion usando epsilon-greedy.
-        Si se provee valid_actions, solo considera acciones validas.
-        """
+        # exploracion aleatoria
         if training and random.random() < self.epsilon:
-            # Exploracion: accion aleatoria
             if valid_actions is not None:
                 return random.choice(valid_actions)
             return random.randrange(self.n_actions)
 
-        # Explotacion: mejor accion segun Q-values
+        # explotacion usando red neuronal
         with torch.no_grad():
             state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
             q_values = self.policy_net(state_tensor)
 
-            # Aplicar mascara de acciones invalidas
+            # aplicar mascara de acciones validas
             if valid_actions is not None:
                 q_values_masked = q_values.clone()
                 mask = torch.ones(self.n_actions, dtype=torch.bool)
@@ -114,29 +97,18 @@ class DQNAgent:
 
             return q_values.argmax().item()
 
+    # selecciona acciones en lote para entornos paralelos
     def select_actions_batch(self, states, training=True, valid_actions_list=None):
-        """
-        Selecciona acciones para un batch de estados (optimizado para GPU).
-        Util para entrenamiento paralelo con multiples entornos.
-
-        Args:
-            states: array de estados (num_envs, height, width)
-            training: si True, aplica epsilon-greedy
-            valid_actions_list: lista de listas con acciones validas por entorno
-
-        Returns:
-            lista de acciones seleccionadas
-        """
         batch_size = len(states)
         actions = []
 
-        # Determinar que acciones seran aleatorias (epsilon-greedy)
+        # generar mascara para exploracion
         if training:
             random_mask = np.random.random(batch_size) < self.epsilon
         else:
             random_mask = np.zeros(batch_size, dtype=bool)
 
-        # Acciones aleatorias
+        # acciones aleatorias para exploracion
         random_actions = []
         for i in range(batch_size):
             if random_mask[i]:
@@ -145,7 +117,7 @@ class DQNAgent:
                 else:
                     random_actions.append(random.randrange(self.n_actions))
 
-        # Acciones greedy (batch inference en GPU)
+        # acciones greedy usando la red neuronal
         if not random_mask.all():
             greedy_indices = np.where(~random_mask)[0]
             greedy_states = states[greedy_indices]
@@ -154,7 +126,7 @@ class DQNAgent:
                 state_tensor = torch.FloatTensor(greedy_states).to(self.device)
                 q_values = self.policy_net(state_tensor)
 
-                # Aplicar mascaras de acciones invalidas
+                # aplicar mascaras de acciones validas
                 if valid_actions_list:
                     for i, idx in enumerate(greedy_indices):
                         if valid_actions_list[idx]:
@@ -164,7 +136,6 @@ class DQNAgent:
 
                 greedy_actions = q_values.argmax(dim=1).cpu().numpy()
 
-        # Combinar acciones aleatorias y greedy
         random_idx = 0
         greedy_idx = 0
         for i in range(batch_size):
@@ -177,30 +148,33 @@ class DQNAgent:
 
         return actions
 
+    # guarda experiencia en el buffer de replay
     def store_transition(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
-    
+
+    # entrena la red con un batch de experiencias
     def train_step(self):
         if len(self.memory) < self.batch_size:
             return 0.0
 
+        # muestrear batch del buffer
         batch = random.sample(self.memory, self.batch_size)
         states, actions, rewards, next_states, dones = zip(*batch)
 
+        # convertir a tensores
         states = torch.FloatTensor(np.array(states)).to(self.device)
         actions = torch.LongTensor(actions).to(self.device)
         rewards = torch.FloatTensor(rewards).to(self.device)
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.FloatTensor(dones).to(self.device)
 
-        # Forward pass con mixed precision (FP16) si GPU disponible
+        # entrenamiento con precision mixta si hay GPU
         if self.scaler is not None:
-            # Modo FP16 para aprovechar tensor cores
             with torch.amp.autocast('cuda'):
-                # Valores Q actuales
+                # calcular Q-values actuales
                 current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
 
-                # Valores Q objetivo (target)
+                # calcular targets usando double DQN o DQN clasico
                 with torch.no_grad():
                     if self.use_double_dqn:
                         next_actions = self.policy_net(next_states).argmax(1)
@@ -209,10 +183,9 @@ class DQNAgent:
                         next_q = self.target_net(next_states).max(1)[0]
                     target_q = rewards + (1 - dones) * self.gamma * next_q
 
-                # Loss
                 loss = nn.MSELoss()(current_q.squeeze(), target_q)
 
-            # Backward con gradient scaling
+            # actualizar pesos con gradient clipping
             self.optimizer.zero_grad()
             self.scaler.scale(loss).backward()
             self.scaler.unscale_(self.optimizer)
@@ -220,7 +193,7 @@ class DQNAgent:
             self.scaler.step(self.optimizer)
             self.scaler.update()
         else:
-            # Modo FP32 normal (sin GPU o CPU)
+            # entrenamiento sin precision mixta
             current_q = self.policy_net(states).gather(1, actions.unsqueeze(1))
 
             with torch.no_grad():
@@ -238,17 +211,18 @@ class DQNAgent:
             torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), 1.0)
             self.optimizer.step()
 
-        # Update target network
         self.steps += 1
+        # actualizar red objetivo periodicamente
         if self.steps % self.target_update == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
 
-        # Decay epsilon
+        # decaer epsilon
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
         return loss.item()
-    
+
+    # guarda el modelo entrenado
     def save(self, path):
         torch.save({
             'policy_net': self.policy_net.state_dict(),
@@ -257,7 +231,8 @@ class DQNAgent:
             'epsilon': self.epsilon,
             'steps': self.steps
         }, path)
-    
+
+    # carga un modelo previamente entrenado
     def load(self, path):
         checkpoint = torch.load(path)
         self.policy_net.load_state_dict(checkpoint['policy_net'])

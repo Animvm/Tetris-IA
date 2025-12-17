@@ -9,24 +9,17 @@ from agents.dqn_agent import DQNAgent
 from utils.parallel_env import ParallelEnv
 
 def make_env():
-    """Funcion para crear entorno (debe estar en top-level para pickle en Windows)."""
     return TetrisEnv(use_action_masking=True)
 
 def test_parallel_env():
-    """
-    Prueba rapida del entrenamiento paralelo.
-    Verifica que los entornos paralelos funcionan correctamente.
-    """
     print("Probando entrenamiento paralelo...")
     print("="*60)
 
     num_envs = 4
     test_episodes = 20
 
-    # Crear entornos paralelos
     parallel_envs = ParallelEnv(make_env, num_envs=num_envs)
 
-    # Crear agente
     single_env = make_env()
     agent = DQNAgent(
         single_env,
@@ -42,7 +35,6 @@ def test_parallel_env():
     print(f"  Device: {agent.device}")
     print(f"  Episodios de prueba: {test_episodes}")
 
-    # Resetear entornos
     obs_batch, _ = parallel_envs.reset()
     print(f"\nObservaciones shape: {obs_batch.shape}")
 
@@ -54,20 +46,16 @@ def test_parallel_env():
     print(f"\nEjecutando {test_episodes} episodios...")
 
     while episode_count < test_episodes:
-        # Obtener acciones validas
         valid_actions_batch = parallel_envs.get_valid_actions()
 
-        # Seleccionar acciones batch
         actions = agent.select_actions_batch(
             obs_batch,
             training=True,
             valid_actions_list=valid_actions_batch
         )
 
-        # Step paralelo
         next_obs_batch, rewards, dones, truncated, infos = parallel_envs.step(actions)
 
-        # Almacenar transiciones
         for i in range(num_envs):
             agent.store_transition(
                 obs_batch[i],
@@ -77,7 +65,6 @@ def test_parallel_env():
                 dones[i]
             )
 
-            # Si termino un episodio
             if dones[i] or truncated[i]:
                 episode_scores.append(infos[i]['score'])
                 episode_lines.append(infos[i]['lines'])
@@ -88,7 +75,6 @@ def test_parallel_env():
                 if episode_count >= test_episodes:
                     break
 
-        # Entrenar si hay suficientes muestras
         if len(agent.memory) >= agent.batch_size:
             agent.train_step()
 
@@ -96,7 +82,6 @@ def test_parallel_env():
 
     elapsed_time = time.time() - start_time
 
-    # Cerrar entornos
     parallel_envs.close()
 
     print("\n" + "="*60)

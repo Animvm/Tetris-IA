@@ -4,8 +4,8 @@ sys.path.append('.')
 from envs.tetris_env import TetrisEnv
 from agents.mcts_agent import MCTSAgent
 
+# entrena y evalua agente MCTS
 def entrenar(episodios=100, simulaciones=100, visualizar_final=False):
-    # Evalua agente MCTS sin entrenamiento (determinista)
     env = TetrisEnv(rows=20, cols=10)
     agente = MCTSAgent(env, num_simulaciones=simulaciones, max_profundidad=8)
 
@@ -36,7 +36,6 @@ def entrenar(episodios=100, simulaciones=100, visualizar_final=False):
     print(f"Puntaje promedio: {sum(scores)/len(scores):.1f}")
     print(f"Lineas promedio: {sum(lines_list)/len(lines_list):.1f}")
 
-    # Guardar resultados en CSV
     import pandas as pd
     import os
 
@@ -52,13 +51,13 @@ def entrenar(episodios=100, simulaciones=100, visualizar_final=False):
     print(f"\nCSV guardado: results/mcts_metrics.csv")
 
     env.close()
-    
+
     if visualizar_final:
         print("\n=== Visualizando episodio final ===")
         visualizar_episodio(agente)
 
+# visualiza un episodio del agente MCTS
 def visualizar_episodio(agente):
-    # Muestra episodio MCTS en ventana pygame
     import pygame
 
     env_visual = TetrisEnv(rows=20, cols=10, render_mode="human")
