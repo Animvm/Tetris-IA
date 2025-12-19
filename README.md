@@ -37,8 +37,3 @@ Ver el agente jugando:
 ```bash
 python experiments/visualize_run.py
 ```
-
-Analizar resultados:
-```bash
-python experiments/analyze_training.py results/run_TIMESTAMP
-```
